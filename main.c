@@ -2,48 +2,34 @@
 #include <math.h>
 #define SET_SIZE( f ) (f / freqIntr_mcs )
 
-static volatile uint32_t count = 0;  // Счётчик прерываний
-static const uint16_t period = 72 * 6;
+static volatile uint32_t count = 0;      // Счётчик прерываний
+static const uint16_t period = 72 * 6;   // Период таймера
+static const uint32_t freqIntr_mcs = 6;  // Период вызова прерываний в мкс
+static const double Pi = 3.14159265358979323846;  // Значение пи с точностью до 20-и знаков после запятой
+
+// Длины массивов значений синусов
+static const uint32_t sizeSinArr[8] = {SET_SIZE( 954 ), SET_SIZE( 852 ), SET_SIZE( 756 ), SET_SIZE( 714 ),
+                                       SET_SIZE( 636 ), SET_SIZE( 582 ), SET_SIZE( 504 ), SET_SIZE( 480 )};
+
+// Двумерный массив значений синусов. Каждая строка - значения синуса для одной частоты
+static uint16_t sinArr[8][SET_SIZE( 954 )] = {0};
 
 void SysTick_Handler (void) {
     count++;
 }
 
-static const uint32_t freqIntr_mcs = 6;    // Период вызова прерываний в мкс
-
-// SET_SIZE( f ) - кол-во значащих эл-тов массива значений синуса для каждого звука. 
-// f - период звука в мкс. Округлён так, чтобы делился на 6 мкс - частоту прерываний
-static const uint32_t sizeSinArr[8] = {SET_SIZE( 954 ), SET_SIZE( 852 ), SET_SIZE( 756 ), SET_SIZE( 714 ),
-                                       SET_SIZE( 636 ), SET_SIZE( 582 ), SET_SIZE( 504 ), SET_SIZE( 480 )};
-
-// Массив значений синусов
-static uint16_t sinArr[8][SET_SIZE( 954 )] = {0};
-
-// Значение пи с точностью до 20-и знаков после запятой
-static const double Pi = 3.14159265358979323846;
-
-// Заполняет массив значений синуса
-static void fillSin(uint16_t sinArr[][SET_SIZE( 954 )], const uint32_t * sizeSinX) {
-    for (uint32_t i = 0; i < 8; i++) {
-        for (uint32_t j = 0; j < sizeSinX[i]; j++) {
-            sinArr[i][j] = (sin((Pi * 2.0 * j / sizeSinX[i])) + 1.0) / 2 * period;  
-        }
-    }
-}
-
+// Функция, отвечающая за проигрывание звуков
 static void play(uint32_t numBut) {
-    // Массив для сохранения в массивах синусов индексов, которые воспроизвели в последний раз
+    // Индексы эл-тов из sinArr, которые воспроизвели в последний раз
     uint32_t index[8] = {0};
+    
     // Пока нажата та же комбинация кнопок, играем
     while (numBut == (((GPIOA->IDR & 0xFE) >> 1) | ((GPIOC->IDR & GPIO_Pin_4) << 3))) {
         uint32_t prev = count;
-        uint32_t countBut = 0;
+        uint16_t countBut = 0;  // Сколько зажато кнопок
+        uint16_t sound = 0;  // Звук, который надо проиграть
         
-        // Звук, который надо проиграть
-        uint16_t sound = 0;
-        
-        // Проверяем коды всех кнопок. Если кнопки нажаты,
-        // складываем значения  
+        // Суммируем значения синусов нажатых кнопок  
         for (uint32_t i = 0; i < 8; i++) {
             if (numBut & (1 << i)) {
                 sound += sinArr[i][index[i]];
@@ -51,12 +37,15 @@ static void play(uint32_t numBut) {
                 countBut++;
             }
         }
+        
+        // Вычисляем среднее и играем
         sound /= countBut;
-        TIM_SetCompare1(TIM3, sound);  // Задаём заполнение
-        while (count - prev < 1) { }         // Ждём 
+        TIM_SetCompare1(TIM3, sound);
+        while (count - prev < 1) { }
     }
 }
 
+// Функция отвечающая за сканирование клавиш и вызов play при необходдимости
 static void scan() {
     // Сохраняем состояния кнопок PA1-PA7 и PC4
     uint32_t numBut = ((GPIOA->IDR & 0xFE) >> 1) | ((GPIOC->IDR & GPIO_Pin_4) << 3);  
@@ -64,6 +53,15 @@ static void scan() {
         play(numBut);  // Проигрываем соответсвующие звуки
     }
     TIM_SetCompare1(TIM3, 0);
+}
+
+// Функция, заполняющая значениями синуса массив
+static void fillSin(uint16_t sinArr[][SET_SIZE( 954 )], const uint32_t * sizeSinX) {
+    for (uint32_t i = 0; i < 8; i++) {
+        for (uint32_t j = 0; j < sizeSinX[i]; j++) {
+            sinArr[i][j] = (sin((Pi * 2.0 * j / sizeSinX[i])) + 1.0) / 2 * period;  
+        }
+    }
 }
 
 int main(void)
