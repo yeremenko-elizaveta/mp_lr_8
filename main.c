@@ -34,9 +34,8 @@ static void fillSin(uint16_t sinArr[][SET_SIZE( 954 )], const uint32_t * sizeSin
 static void play(uint32_t numBut) {
     // Массив для сохранения в массивах синусов индексов, которые воспроизвели в последний раз
     uint32_t index[8] = {0};
-    // Пока нажата данная комбинация кнопок, играем
-    while ((((numBut & 0x7F) << 1) == (GPIO_ReadInputData(GPIOA) & 0xFE)) && 
-           (((GPIO_ReadInputData(GPIOC) & GPIO_Pin_4) << 3) == (numBut & 0x80))) {
+    // Пока нажата та же комбинация кнопок, играем
+    while (numBut == (((GPIOA->IDR & 0xFE) >> 1) | ((GPIOC->IDR & GPIO_Pin_4) << 3))) {
         uint32_t prev = count;
         uint32_t countBut = 0;
         
@@ -59,8 +58,8 @@ static void play(uint32_t numBut) {
 }
 
 static void scan() {
-    uint32_t numBut = (GPIO_ReadInputData(GPIOA) & 0xFE) >> 1;  // Сохраняем состояния кнопок PA1-PA7
-    numBut |= (GPIO_ReadInputData(GPIOC) & GPIO_Pin_4) << 3;    // Сохраняем состояние кнопки PC4
+    // Сохраняем состояния кнопок PA1-PA7 и PC4
+    uint32_t numBut = ((GPIOA->IDR & 0xFE) >> 1) | ((GPIOC->IDR & GPIO_Pin_4) << 3);  
     if (numBut > 0) {
         play(numBut);  // Проигрываем соответсвующие звуки
     }
