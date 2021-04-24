@@ -40,7 +40,7 @@ static void play(uint32_t numBut) {
         uint32_t countBut = 0;
         
         // Звук, который надо проиграть
-        double sound = 0;
+        uint16_t sound = 0;
         
         // Проверяем коды всех кнопок. Если кнопки нажаты,
         // складываем значения  
